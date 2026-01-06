@@ -1,0 +1,144 @@
+---
+- name: "Create group {{ podman_user_group }}"
+  ansible.builtin.group:
+    name: "{{ podman_user_group }}"
+    system: true
+  register: podman_group
+
+- name: "Create user {{ podman_user_name }}"
+  ansible.builtin.user:
+    name: "{{ podman_user_name }}"
+    group: "{{ podman_user_group }}"
+    shell: /bin/nologin
+    system: true
+    create_home: false
+  register: podman_user
+
+- name: "Restrict podman usage to dedicated podman user"
+  when: podman_restrict_user | bool
+  block:
+    - name: "Ensure podman binary is restricted to podman group"
+      ansible.builtin.file:
+        path: /usr/bin/podman
+        owner: root
+        group: "{{ podman_user_group }}"
+        mode: '0750'
+
+    - name: "Ensure ansible user is NOT member of podman group"
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: "{{ podman_user_group }}"
+        append: false
+
+    - name: "Allow ansible user to run podman via sudo only"
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/podman
+        owner: root
+        group: root
+        mode: '0440'
+        content: |
+          ansible ALL=(root) NOPASSWD: /usr/bin/podman
+          ansible ALL=({{ podman_user_name }}) NOPASSWD: /usr/bin/podman
+
+- name: "Allow ansible user to run podman directly"
+  when: not podman_restrict_user | bool
+  block:
+    - name: "Ensure podman binary is executable by podman group"
+      ansible.builtin.file:
+        path: /usr/bin/podman
+        owner: root
+        group: "{{ podman_user_group }}"
+        mode: '0750'
+
+    - name: "Add ansible user to podman user group"
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: "{{ podman_user_group }}"
+        append: true
+
+    - name: "Remove sudo-only restriction for podman (if present)"
+      ansible.builtin.file:
+        path: /etc/sudoers.d/podman
+        state: absent
+
+- name: "Add podman user to systemd-journal group"
+  ansible.builtin.user:
+    name: "{{ podman_user_name }}"
+    groups: systemd-journal
+    append: true
+
+- name: "Ensure user system.d directory"
+  ansible.builtin.file:
+    path: /etc/systemd/system/user@.service.d
+    mode: '0755'
+    state: directory
+
+- name: "Enable CPU, CPUSET, MEMORY, and I/O delegation"
+  ansible.builtin.copy:
+    src: files/delegate.conf
+    dest: /etc/systemd/system/user@.service.d/delegate.conf
+    mode: '0644'
+    owner: root
+    group: root
+  notify: Reload systemd
+
+- name: "Set podman user facts"
+  ansible.builtin.set_fact:
+    podman_user_home: "{{ podman_user.home }}"
+    podman_user_uid: "{{ podman_user.uid }}"
+    podman_user_gid: "{{ podman_group.gid }}"
+
+- name: "Add podman user to subuid file"
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    regexp: "^{{ podman_user_name }}:.*"
+    line: "{{ podman_user_name }}:165536:65536"
+    create: true
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: "Add podman user group to subgid file"
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    regexp: "^{{ podman_user_group }}:.*"
+    line: "{{ podman_user_group }}:165536:65536"
+    create: true
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: "Enable lingering for podman user"
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ podman_user_name }}"
+    creates: "/var/lib/systemd/linger/{{ podman_user_name }}"
+  become: true
+
+- name: "Ensure XDG_RUNTIME_DIR is set for podman user"
+  ansible.builtin.set_fact:
+    podman_xdg_runtime_dir: "/run/user/{{ podman_user_uid }}"
+
+- name: "Enable podman user socket"
+  ansible.builtin.systemd_service:
+    name: podman.socket
+    enabled: true
+    scope: user
+  environment:
+    XDG_RUNTIME_DIR: "{{ podman_xdg_runtime_dir }}"
+  become: true
+  become_user: "{{ podman_user_name }}"
+  when: podman_enable_user_socket
+
+- name: "Start podman user socket"
+  ansible.builtin.systemd_service:
+    name: podman.socket
+    state: started
+    scope: user
+  environment:
+    XDG_RUNTIME_DIR: "{{ podman_xdg_runtime_dir }}"
+  become: true
+  become_user: "{{ podman_user_name }}"
+  when: podman_enable_user_socket
+
+- name: "Flush handlers"
+  ansible.builtin.meta: flush_handlers

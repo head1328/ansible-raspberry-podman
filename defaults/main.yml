@@ -1,0 +1,5 @@
+---
+podman_user_name: podman
+podman_user_group: podman
+podman_enable_user_socket: true
+podman_restrict_user: true

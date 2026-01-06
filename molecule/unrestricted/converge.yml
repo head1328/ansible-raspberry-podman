@@ -1,0 +1,13 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    podman_user_name: testuser
+    podman_restrict_user: false
+
+  roles:
+    - role: ansible-raspberry-podman
+      tags: podman
