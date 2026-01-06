@@ -1,0 +1,75 @@
+---
+- name: Verify
+  hosts: all
+  become: false
+  gather_facts: true
+
+  vars:
+    podman_user_name: testuser
+    podman_user_group: podman
+
+  tasks:
+    - name: Verify podman is installed
+      ansible.builtin.command:
+        cmd: podman --version
+      register: podman_version
+      changed_when: false
+      failed_when: podman_version.rc != 0
+
+    - name: Verify podman group exists
+      ansible.builtin.getent:
+        database: group
+        key: "{{ podman_user_group }}"
+      register: podman_group_result
+      failed_when: podman_group_result.ansible_facts.getent_group[podman_user_group] is not defined
+
+    - name: Verify podman user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ podman_user_name }}"
+      register: podman_user_result
+      failed_when: podman_user_result.ansible_facts.getent_passwd[podman_user_name] is not defined
+
+    - name: Verify podman user is in correct group
+      ansible.builtin.command:
+        cmd: "id -gn {{ podman_user_name }}"
+      register: user_group
+      changed_when: false
+      failed_when: user_group.stdout != podman_user_group
+
+    - name: Verify subuid configuration
+      ansible.builtin.lineinfile:
+        path: /etc/subuid
+        line: "{{ podman_user_name }}:165536:65536"
+        state: present
+      check_mode: true
+      register: subuid_check
+      failed_when: subuid_check is changed
+
+    - name: Verify subgid configuration
+      ansible.builtin.lineinfile:
+        path: /etc/subgid
+        line: "{{ podman_user_group }}:165536:65536"
+        state: present
+      check_mode: true
+      register: subgid_check
+      failed_when: subgid_check is changed
+
+    - name: Verify lingering is enabled
+      ansible.builtin.stat:
+        path: "/var/lib/systemd/linger/{{ podman_user_name }}"
+      register: linger_file
+      failed_when: not linger_file.stat.exists
+
+    - name: Verify systemd delegation configuration
+      ansible.builtin.stat:
+        path: /etc/systemd/system/user@.service.d/delegate.conf
+      register: delegate_conf
+      failed_when: not delegate_conf.stat.exists
+
+    - name: Verify podman user has systemd-journal access
+      ansible.builtin.command:
+        cmd: "id -Gn {{ podman_user_name }}"
+      register: user_groups
+      changed_when: false
+      failed_when: "'systemd-journal' not in user_groups.stdout"

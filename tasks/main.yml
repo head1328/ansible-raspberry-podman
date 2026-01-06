@@ -1,0 +1,9 @@
+---
+- name: "Install podman"
+  ansible.builtin.apt:
+    name: podman
+    state: present
+    update_cache: true
+
+- name: "Setup podman user"
+  ansible.builtin.include_tasks: user.yml

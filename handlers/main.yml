@@ -1,0 +1,8 @@
+---
+- name: Reset connection
+  ansible.builtin.meta: reset_connection
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true

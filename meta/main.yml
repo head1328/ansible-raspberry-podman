@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: podman
+  namespace: head1328
+  description: Setup podman
+  author: Kevin Horst <info@kevinhorst.de>
+  company: KevinHorst IT
+  license: AGPL-3.0-or-later
+  min_ansible_version: '2.16.5'
+  platforms:
+    - name: Debian
+      versions:
+        - trixie
+  galaxy_tags:
+    - raspberry
+    - pi
+    - raspberrypi
+    - podman
+
+dependencies: []

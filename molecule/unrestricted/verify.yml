@@ -1,0 +1,43 @@
+---
+- name: Verify
+  hosts: all
+  become: false
+  gather_facts: true
+
+  vars:
+    podman_user_name: testuser
+    podman_user_group: podman
+
+  tasks:
+    - name: Verify podman is installed
+      ansible.builtin.command:
+        cmd: podman --version
+      register: podman_version
+      changed_when: false
+      failed_when: podman_version.rc != 0
+
+    - name: Verify podman group exists
+      ansible.builtin.getent:
+        database: group
+        key: "{{ podman_user_group }}"
+      register: podman_group_result
+      failed_when: podman_group_result.ansible_facts.getent_group[podman_user_group] is not defined
+
+    - name: Verify ansible user is in podman group
+      ansible.builtin.command:
+        cmd: "id -Gn ansible"
+      register: ansible_user_groups
+      changed_when: false
+      failed_when: "'podman' not in ansible_user_groups.stdout"
+
+    - name: Verify sudoers restriction file does not exist
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/podman
+      register: sudoers_file
+      failed_when: sudoers_file.stat.exists
+
+    - name: Verify podman binary is executable by group
+      ansible.builtin.stat:
+        path: /usr/bin/podman
+      register: podman_binary
+      failed_when: podman_binary.stat.mode != '0750'

@@ -1,0 +1,35 @@
+---
+argument_specs:
+  main:
+    short_description: Main entrypoint for the podman role
+    author: Kevin Horst <info@kevinhorst.de>
+
+    options:
+      podman_user_name:
+        type: str
+        required: true
+        description:
+          - Name of the user to be enabled for Podman.
+
+      podman_user_group:
+        type: str
+        required: false
+        description:
+          - Name of the primary group for the Podman user.
+          - Defaults to the same name as podman_user_name.
+
+      podman_enable_user_socket:
+        type: bool
+        required: false
+        default: true
+        description:
+          - Enable and start the Podman user socket (podman.socket).
+          - If set to false, the user socket will not be enabled or started.
+
+      podman_restrict_user:
+        type: bool
+        required: false
+        default: true
+        description:
+          - Restrict podman usage to dedicated podman user.
+          - If set to false, every user can interact with podman.
