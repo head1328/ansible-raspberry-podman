@@ -42,6 +42,7 @@ This role uses [Molecule](https://molecule.readthedocs.io/) for testing with Pod
 
 - **default**: Tests the role with `podman_restrict_user: true` (restricted mode)
 - **unrestricted**: Tests the role with `podman_restrict_user: false` (unrestricted mode)
+- **local**: Runs the role inside the instance as root with `connection: local` and without `ansible_user` (cloud-init)
 
 ### Running Tests Locally
 
@@ -54,6 +55,9 @@ make test-all
 
 # Run unrestricted scenario only
 make test-unrestricted
+
+# Run local root scenario only
+make test-local
 
 # Development workflow
 make converge  # Apply the role
