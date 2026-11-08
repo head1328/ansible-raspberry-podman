@@ -3,3 +3,13 @@ podman_user_name: podman
 podman_user_group: podman
 podman_enable_user_socket: true
 podman_restrict_user: true
+podman_admin_user: "{{ ansible_user | default('') }}"
+podman_packages:
+  - podman
+  - uidmap
+  - passt
+  - slirp4netns
+  - dbus-user-session
+  - catatonit
+  - aardvark-dns
+  - nftables

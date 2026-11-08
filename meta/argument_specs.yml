@@ -31,5 +31,21 @@ argument_specs:
         required: false
         default: true
         description:
-          - Restrict podman usage to dedicated podman user.
-          - If set to false, every user can interact with podman.
+          - Restrict podman usage to the podman user and to podman_admin_user via sudo.
+          - If set to false, podman_admin_user is added to podman_user_group and can run podman directly.
+          - In both modes /usr/bin/podman is only executable by members of podman_user_group.
+
+      podman_admin_user:
+        type: str
+        required: false
+        description:
+          - User that gets podman access via sudo (restricted) or group membership (unrestricted).
+          - Defaults to ansible_user, or empty if ansible_user is undefined.
+          - Empty or root skips all admin user tasks.
+
+      podman_packages:
+        type: list
+        elements: str
+        required: false
+        description:
+          - Packages installed for rootless podman, including Recommends of podman and netavark.
