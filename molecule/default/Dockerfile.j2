@@ -26,7 +26,8 @@ RUN export DEBIAN_FRONTEND=noninteractive ; \
     podman \
  && apt-get clean \
  && rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/* /tmp/* /var/tmp/* \
- && useradd -m -s /bin/bash ansible \
+ && groupadd --system podman \
+ && useradd -m -s /bin/bash -G users,podman ansible \
  && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
 
 # Don't start any optional services except for the few we need.

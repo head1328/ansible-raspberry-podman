@@ -67,6 +67,50 @@
       register: delegate_conf
       failed_when: not delegate_conf.stat.exists
 
+    - name: Verify podman user home exists
+      ansible.builtin.stat:
+        path: "/home/{{ podman_user_name }}"
+      register: podman_home
+      failed_when: not podman_home.stat.isdir | default(false) or podman_home.stat.pw_name != podman_user_name
+
+    - name: Read ansible user groups
+      ansible.builtin.command:
+        cmd: "id -Gn ansible"
+      register: ansible_user_groups
+      changed_when: false
+
+    - name: Verify ansible user was removed from podman group only
+      ansible.builtin.assert:
+        that:
+          - "'podman' not in ansible_user_groups.stdout.split()"
+          - "'users' in ansible_user_groups.stdout.split()"
+
+    - name: Read sudoers rule for podman
+      ansible.builtin.slurp:
+        path: /etc/sudoers.d/podman
+      register: podman_sudoers
+      become: true
+
+    - name: Verify sudoers rule uses admin user
+      ansible.builtin.assert:
+        that:
+          - "'ansible ALL=(root) NOPASSWD: /usr/bin/podman' in podman_sudoers.content | b64decode"
+          - "'ansible ALL=(' ~ podman_user_name ~ ') NOPASSWD: /usr/bin/podman' in podman_sudoers.content | b64decode"
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+
+    - name: Verify rootless dependencies are installed
+      ansible.builtin.assert:
+        that: item in ansible_facts.packages
+      loop: [uidmap, passt, slirp4netns, dbus-user-session, catatonit, aardvark-dns, nftables]
+
+    - name: Verify newuidmap is available
+      ansible.builtin.stat:
+        path: /usr/bin/newuidmap
+      register: newuidmap
+      failed_when: not newuidmap.stat.exists
+
     - name: Verify podman user has systemd-journal access
       ansible.builtin.command:
         cmd: "id -Gn {{ podman_user_name }}"

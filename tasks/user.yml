@@ -11,7 +11,7 @@
     group: "{{ podman_user_group }}"
     shell: /bin/nologin
     system: true
-    create_home: false
+    create_home: true
   register: podman_user
 
 - name: "Restrict podman usage to dedicated podman user"
@@ -24,23 +24,40 @@
         group: "{{ podman_user_group }}"
         mode: '0750'
 
-    - name: "Ensure ansible user is NOT member of podman group"
-      ansible.builtin.user:
-        name: "{{ ansible_user }}"
-        groups: "{{ podman_user_group }}"
-        append: false
+    - name: "Read members of group {{ podman_user_group }}"
+      ansible.builtin.getent:
+        database: group
+        key: "{{ podman_user_group }}"
+      when: __podman_manage_admin_user | bool
 
-    - name: "Allow ansible user to run podman via sudo only"
+    # ansible.builtin.user cannot remove a single group without listing all others.
+    - name: "Ensure admin user is not member of podman group"
+      ansible.builtin.command:
+        cmd: "gpasswd --delete {{ podman_admin_user }} {{ podman_user_group }}"
+      changed_when: true
+      when:
+        - __podman_manage_admin_user | bool
+        - podman_admin_user in ansible_facts.getent_group[podman_user_group][2].split(',')
+
+    - name: "Allow admin user to run podman via sudo only"
       ansible.builtin.copy:
         dest: /etc/sudoers.d/podman
         owner: root
         group: root
         mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
         content: |
-          ansible ALL=(root) NOPASSWD: /usr/bin/podman
-          ansible ALL=({{ podman_user_name }}) NOPASSWD: /usr/bin/podman
+          {{ podman_admin_user }} ALL=(root) NOPASSWD: /usr/bin/podman
+          {{ podman_admin_user }} ALL=({{ podman_user_name }}) NOPASSWD: /usr/bin/podman
+      when: __podman_manage_admin_user | bool
 
-- name: "Allow ansible user to run podman directly"
+    - name: "Remove sudo rule for podman without admin user"
+      ansible.builtin.file:
+        path: /etc/sudoers.d/podman
+        state: absent
+      when: not __podman_manage_admin_user | bool
+
+- name: "Allow admin user to run podman directly"
   when: not podman_restrict_user | bool
   block:
     - name: "Ensure podman binary is executable by podman group"
@@ -50,11 +67,12 @@
         group: "{{ podman_user_group }}"
         mode: '0750'
 
-    - name: "Add ansible user to podman user group"
+    - name: "Add admin user to podman user group"
       ansible.builtin.user:
-        name: "{{ ansible_user }}"
+        name: "{{ podman_admin_user }}"
         groups: "{{ podman_user_group }}"
         append: true
+      when: __podman_manage_admin_user | bool
 
     - name: "Remove sudo-only restriction for podman (if present)"
       ansible.builtin.file:

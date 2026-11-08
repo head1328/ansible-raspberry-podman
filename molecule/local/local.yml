@@ -1,0 +1,11 @@
+---
+# Runs inside the instance as root, like cloud-init. ansible_user stays undefined.
+- name: Local run as root
+  hosts: localhost
+  connection: local
+
+  vars:
+    podman_enable_user_socket: false
+
+  roles:
+    - role: head1328.podman

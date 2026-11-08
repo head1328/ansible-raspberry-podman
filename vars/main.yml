@@ -1,0 +1,2 @@
+---
+__podman_manage_admin_user: "{{ podman_admin_user | length > 0 and podman_admin_user != 'root' }}"

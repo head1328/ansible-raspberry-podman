@@ -37,6 +37,10 @@ login:
 test-unrestricted:
 	molecule test --scenario-name unrestricted
 
+.PHONY: test-local
+test-local:
+	molecule test --scenario-name local
+
 .PHONY: lint
 lint:
 	ansible-lint --force-color .

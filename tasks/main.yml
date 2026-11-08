@@ -1,7 +1,7 @@
 ---
-- name: "Install podman"
+- name: "Install podman and rootless dependencies"
   ansible.builtin.apt:
-    name: podman
+    name: "{{ podman_packages }}"
     state: present
     update_cache: true
 
