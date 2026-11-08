@@ -16,5 +16,6 @@
   "updateRemoteUserUID": true,
   "mounts": [
     "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,readonly"
-  ]
+  ],
+  "postCreateCommand": "pip install 'molecule-plugins[podman]==26.11.0'"
 }
