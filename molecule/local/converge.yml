@@ -1,0 +1,28 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Copy role into instance
+      ansible.builtin.copy:
+        src: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}/{{ item }}"
+        dest: /opt/ansible/roles/head1328.podman/
+        mode: preserve
+      loop: [defaults, files, handlers, meta, tasks, vars]
+
+    - name: Copy local playbook into instance
+      ansible.builtin.copy:
+        src: local.yml
+        dest: /opt/ansible/local.yml
+        mode: '0644'
+
+    # Reports changed only if the inner run changed something, so molecule idempotence checks the inner run.
+    - name: Run role locally as root
+      ansible.builtin.command:
+        cmd: ansible-playbook /opt/ansible/local.yml
+      environment:
+        ANSIBLE_ROLES_PATH: /opt/ansible/roles
+        ANSIBLE_NOCOLOR: "1"
+      register: local_run
+      changed_when: local_run.stdout is regex('changed=[1-9]')

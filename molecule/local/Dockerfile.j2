@@ -1,0 +1,37 @@
+{% if item.registry is defined %}
+FROM {{ item.registry.url }}/{{ item.image }}
+{% else %}
+FROM {{ item.image }}
+{% endif %}
+
+ENV container podman
+# ansible-core refuses to start without a UTF-8 locale.
+ENV LC_ALL=C.UTF-8 TZ=UTC TERM=xterm-256color
+
+# Like a Hetzner cloud image: no Recommends, no ansible user, podman not preinstalled.
+RUN export DEBIAN_FRONTEND=noninteractive ; \
+ apt-get update \
+ && apt-get install -y --no-install-recommends \
+    systemd systemd-sysv dbus \
+    sudo ca-certificates \
+    python3 python3-apt \
+    ansible-core \
+ && apt-get clean \
+ && rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Don't start any optional services except for the few we need.
+RUN find /etc/systemd/system \
+ /lib/systemd/system \
+ /usr/lib/systemd/system \
+ -path '*.wants/*' \
+ -not -name '*dbus*' \
+ -not -name '*journald*' \
+ -not -name '*systemd-tmpfiles*' \
+ -not -name '*systemd-user-sessions*' \
+ -exec rm {} \; 2>/dev/null || true
+
+RUN systemctl set-default multi-user.target
+
+STOPSIGNAL SIGRTMIN+3
+VOLUME [ "/sys/fs/cgroup" ]
+CMD ["/sbin/init"]

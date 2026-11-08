@@ -1,0 +1,46 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Verify podman runs
+      ansible.builtin.command:
+        cmd: podman --version
+      changed_when: false
+
+    - name: Verify podman user home exists
+      ansible.builtin.stat:
+        path: /home/podman
+      register: podman_home
+      failed_when: not podman_home.stat.isdir | default(false) or podman_home.stat.pw_name != 'podman'
+
+    - name: Read root groups
+      ansible.builtin.command:
+        cmd: id -Gn root
+      register: root_groups
+      changed_when: false
+
+    - name: Verify root groups are untouched
+      ansible.builtin.assert:
+        that: root_groups.stdout == 'root'
+
+    - name: Verify no sudoers rule without admin user
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/podman
+      register: podman_sudoers
+      failed_when: podman_sudoers.stat.exists
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+
+    - name: Verify rootless dependencies are installed
+      ansible.builtin.assert:
+        that: item in ansible_facts.packages
+      loop: [uidmap, passt, slirp4netns, dbus-user-session, catatonit, aardvark-dns, nftables]
+
+    - name: Verify lingering is enabled
+      ansible.builtin.stat:
+        path: /var/lib/systemd/linger/podman
+      register: linger_file
+      failed_when: not linger_file.stat.exists
